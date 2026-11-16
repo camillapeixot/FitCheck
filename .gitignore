@@ -1,0 +1,35 @@
+# Xcode - arquivos gerados e temporários
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+
+# Configurações pessoais do Xcode
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# Arquivos temporários
+*.swp
+*.swo
+*~
+
+# Swift Package Manager
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+.build/
+
+# Swift Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Fastlane (caso utilize futuramente)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Arquivos de ambiente e segredos
+.env
+.env.*
+!.env.example
+Secrets.xcconfig

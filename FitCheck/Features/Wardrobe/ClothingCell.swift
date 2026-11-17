@@ -13,7 +13,8 @@ final class ClothingCell: UICollectionViewCell {
 
     private let symbolView: UIImageView = {
         let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFit
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
         imageView.tintColor = .systemPurple
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView

@@ -13,7 +13,7 @@ final class ViewController: UIViewController {
 
         imageView.image = UIImage(systemName: "hanger")
 
-        imageView.tintColor = .systemPurple
+        imageView.tintColor = UIColor(named: "BrandPrimary") ?? .systemPurple
         imageView.contentMode = .scaleAspectFit
 
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -65,7 +65,8 @@ final class ViewController: UIViewController {
         config.image = UIImage(systemName: "plus")
         config.imagePlacement = .leading
         config.imagePadding = 8
-        config.baseBackgroundColor = .systemPurple
+        config.baseBackgroundColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
         
         let button = UIButton(configuration: config)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -81,13 +82,32 @@ final class ViewController: UIViewController {
     
     @objc private func didTapAddItem() {
         let addVC = AddClothingViewController()
-        
-        addVC.onSave = { [weak self] newItem in
-            guard let self = self else { return }
 
-            self.items.append(newItem)
-            self.collectionView.reloadData()
-            self.updateEmptyState()
+        addVC.onSave = { [weak self] newItem -> Bool in
+            guard let self,
+                  let clothingStore = self.clothingStore else {
+                return false
+            }
+
+            do {
+                try clothingStore.save(newItem)
+
+                self.items.append(newItem)
+
+                self.items.sort {
+                    $0.name.localizedCaseInsensitiveCompare($1.name)
+                        == .orderedAscending
+                }
+
+                self.collectionView.reloadData()
+                self.updateEmptyState()
+
+                return true
+
+            } catch {
+                print("Error saving clothing: \(error)")
+                return false
+            }
         }
 
         let navigationController = UINavigationController(
@@ -101,7 +121,8 @@ final class ViewController: UIViewController {
         var configuration = UIButton.Configuration.filled()
 
         configuration.image = UIImage(systemName: "plus")
-        configuration.baseBackgroundColor = .systemPurple
+        configuration.baseBackgroundColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
         configuration.cornerStyle = .capsule
 
         let button = UIButton(configuration: configuration)
@@ -154,6 +175,8 @@ final class ViewController: UIViewController {
     }()
 
     private var items: [ClothingItem] = []
+    
+    private var clothingStore: ClothingStore?
 
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -190,6 +213,42 @@ final class ViewController: UIViewController {
         updateEmptyState()
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        loadSavedItems()
+    }
+    
+    private func loadSavedItems() {
+        do {
+            if clothingStore == nil {
+                clothingStore = try ClothingStore()
+            }
+
+            guard let clothingStore else {
+                return
+            }
+
+            items = try clothingStore.loadItems()
+
+            collectionView.reloadData()
+            updateEmptyState()
+
+        } catch {
+            let alert = UIAlertController(
+                title: "Storage Error",
+                message: "Could not load your wardrobe. \(error.localizedDescription)",
+                preferredStyle: .alert
+            )
+
+            alert.addAction(
+                UIAlertAction(title: "OK", style: .default)
+            )
+
+            present(alert, animated: true)
+        }
+    }
+
     private func setupViews() {
         view.backgroundColor = .systemBackground
 

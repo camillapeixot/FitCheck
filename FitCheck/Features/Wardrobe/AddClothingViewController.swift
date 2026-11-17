@@ -10,7 +10,7 @@ import UIKit
 import PhotosUI
 
 final class AddClothingViewController: UIViewController {
-    var onSave: ((ClothingItem) -> Void)?
+    var onSave: ((ClothingItem) -> Bool)?
     
     private let nameTextField: UITextField = {
         let field = UITextField()
@@ -35,26 +35,74 @@ final class AddClothingViewController: UIViewController {
     private var selectedCategory: ClothingCategory = .tops
 
     private lazy var categoryButton: UIButton = {
-        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.plain()
+
+        configuration.title = selectedCategory.rawValue
+//        configuration.image = UIImage(systemName: "tshirt")
+        configuration.imagePlacement = .leading
+        configuration.imagePadding = 12
+
+        configuration.baseForegroundColor =
+            UIColor(named: "InkPrimary") ?? .label
+
+        configuration.background.backgroundColor =
+            UIColor(named: "BackgroundWarm") ?? .secondarySystemGroupedBackground
+
+        configuration.background.strokeColor = .separator
+        configuration.background.strokeWidth = 1
+        configuration.background.cornerRadius = 14
+
+        configuration.contentInsets = NSDirectionalEdgeInsets(
+            top: 12,
+            leading: 16,
+            bottom: 12,
+            trailing: 44
+        )
+
+        let button = UIButton(configuration: configuration)
+
+        button.contentHorizontalAlignment = .leading
+        button.translatesAutoresizingMaskIntoConstraints = false
 
         let actions = ClothingCategory.allCases.map { category in
             UIAction(title: category.rawValue) { [weak self] _ in
-                self?.selectedCategory = category
-                self?.categoryButton.setTitle(
-                    category.rawValue,
-                    for: .normal
-                )
+                guard let self else { return }
+
+                self.selectedCategory = category
+
+                var updatedConfiguration = self.categoryButton.configuration
+                updatedConfiguration?.title = category.rawValue
+                self.categoryButton.configuration = updatedConfiguration
             }
         }
 
-        button.setTitle(selectedCategory.rawValue, for: .normal)
         button.menu = UIMenu(children: actions)
         button.showsMenuAsPrimaryAction = true
-        button.translatesAutoresizingMaskIntoConstraints = false
+
+        let chevronImageView = UIImageView(
+            image: UIImage(systemName: "chevron.right")
+        )
+
+        chevronImageView.tintColor = .secondaryLabel
+        chevronImageView.translatesAutoresizingMaskIntoConstraints = false
+        chevronImageView.isUserInteractionEnabled = false
+
+        button.addSubview(chevronImageView)
+
+        NSLayoutConstraint.activate([
+            chevronImageView.trailingAnchor.constraint(
+                equalTo: button.trailingAnchor,
+                constant: -16
+            ),
+
+            chevronImageView.centerYAnchor.constraint(
+                equalTo: button.centerYAnchor
+            )
+        ])
 
         return button
     }()
-    
+
     private let clothingImageView: UIImageView = {
         let imageView = UIImageView()
 
@@ -62,6 +110,8 @@ final class AddClothingViewController: UIViewController {
         imageView.contentMode = .scaleAspectFit
         imageView.tintColor = .secondaryLabel
         imageView.clipsToBounds = true
+        imageView.backgroundColor = .secondarySystemGroupedBackground
+        imageView.layer.cornerRadius = 18
 
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -72,9 +122,9 @@ final class AddClothingViewController: UIViewController {
         let stack = UIStackView(
             arrangedSubviews: [
                 clothingImageView,
-                choosePhotoButton,
+                photoButtonsStackView,
                 nameTextField,
-                categoryButton,
+                categoryFieldStackView,
                 saveButton
             ]
         )
@@ -96,11 +146,25 @@ final class AddClothingViewController: UIViewController {
     
     private lazy var choosePhotoButton: UIButton = {
         var configuration = UIButton.Configuration.bordered()
-        configuration.title = "Choose Photo"
+
+        configuration.title = "Choose from\nLibrary"
         configuration.image = UIImage(systemName: "photo.on.rectangle")
+        configuration.imagePlacement = .top
         configuration.imagePadding = 8
+        configuration.cornerStyle = .large
+        configuration.baseForegroundColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
+        configuration.contentInsets = NSDirectionalEdgeInsets(
+            top: 16,
+            leading: 14,
+            bottom: 16,
+            trailing: 14
+        )
 
         let button = UIButton(configuration: configuration)
+
+        button.titleLabel?.numberOfLines = 2
+        button.titleLabel?.textAlignment = .center
 
         button.addTarget(
             self,
@@ -110,11 +174,34 @@ final class AddClothingViewController: UIViewController {
 
         return button
     }()
+    
+    private lazy var takePhotoButton: UIButton = {
+        var configuration = UIButton.Configuration.bordered()
+
+        configuration.title = "Take Photo"
+        configuration.image = UIImage(systemName: "camera")
+        configuration.imagePlacement = .top
+        configuration.imagePadding = 8
+        configuration.cornerStyle = .large
+        configuration.baseForegroundColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
+
+        let button = UIButton(configuration: configuration)
+
+        button.addTarget(
+            self,
+            action: #selector(didTapTakePhoto),
+            for: .touchUpInside
+        )
+
+        return button
+    }()
 
     private lazy var saveButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
         configuration.title = "Save Item"
-        configuration.baseBackgroundColor = .systemPurple
+        configuration.baseBackgroundColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
 
         let button = UIButton(configuration: configuration)
 
@@ -129,6 +216,10 @@ final class AddClothingViewController: UIViewController {
     
     @objc private func didTapChoosePhoto() {
         openPhotoPicker()
+    }
+    
+    @objc private func didTapTakePhoto() {
+        openCamera()
     }
 
     private func openPhotoPicker() {
@@ -145,6 +236,75 @@ final class AddClothingViewController: UIViewController {
         present(picker, animated: true)
     }
     
+    private func openCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            let alert = UIAlertController(
+                title: "Camera unavailable",
+                message: "This device does not have an available camera.",
+                preferredStyle: .alert
+            )
+
+            alert.addAction(UIAlertAction(
+                title: "OK",
+                style: .default
+            ))
+
+            present(alert, animated: true)
+            return
+        }
+
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = self
+        picker.allowsEditing = false
+
+        present(picker, animated: true)
+    }
+    
+    private lazy var photoButtonsStackView: UIStackView = {
+        let stack = UIStackView(
+            arrangedSubviews: [
+                takePhotoButton,
+                choosePhotoButton
+            ]
+        )
+
+        stack.axis = .horizontal
+        stack.spacing = 12
+        stack.alignment = .fill
+        stack.distribution = .fillEqually
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        return stack
+    }()
+    
+    private let categoryLabel: UILabel = {
+        let label = UILabel()
+
+        label.text = "Category"
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
+        label.textColor = .label
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        return label
+    }()
+
+    private lazy var categoryFieldStackView: UIStackView = {
+        let stack = UIStackView(
+            arrangedSubviews: [
+                categoryLabel,
+                categoryButton
+            ]
+        )
+
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.alignment = .fill
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        return stack
+    }()
+
     private var selectedImage: UIImage?
     
     @objc private func didTapSave() {
@@ -176,7 +336,13 @@ final class AddClothingViewController: UIViewController {
             photoData: photoData
         )
 
-        onSave?(newItem)
+        guard onSave?(newItem) == true else {
+            showAlert(
+                message: "Could not save this item. Please try again."
+            )
+            return
+        }
+
         dismiss(animated: true)
     }
     
@@ -274,9 +440,13 @@ final class AddClothingViewController: UIViewController {
             // MARK: - Component Sizes
 
             clothingImageView.heightAnchor.constraint(
-                equalToConstant: 180
+                equalToConstant: 240
             ),
-
+            
+            photoButtonsStackView.heightAnchor.constraint(
+                equalToConstant: 116
+            ),
+            
             nameTextField.heightAnchor.constraint(
                 equalToConstant: 48
             ),
@@ -320,6 +490,7 @@ extension AddClothingViewController: PHPickerViewControllerDelegate {
             DispatchQueue.main.async {
                 self?.selectedImage = image
                 self?.clothingImageView.image = image
+                self?.clothingImageView.contentMode = .scaleAspectFill
             }
         }
     }
@@ -330,6 +501,31 @@ extension AddClothingViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         textField.resignFirstResponder()
         return true
+    }
+}
+
+extension AddClothingViewController:
+    UIImagePickerControllerDelegate,
+    UINavigationControllerDelegate {
+
+    func imagePickerController(
+        _ picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+    ) {
+        if let image = info[.originalImage] as? UIImage {
+            selectedImage = image
+            clothingImageView.image = image
+            clothingImageView.contentMode = .scaleAspectFill
+        }
+
+        picker.dismiss(animated: true)
+    }
+
+
+    func imagePickerControllerDidCancel(
+        _ picker: UIImagePickerController
+    ) {
+        picker.dismiss(animated: true)
     }
 }
 

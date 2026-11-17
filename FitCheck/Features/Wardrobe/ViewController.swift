@@ -59,86 +59,6 @@ final class ViewController: UIViewController {
         return label
     }()
     
-    private lazy var addButton: UIButton = {
-        var config = UIButton.Configuration.filled()
-        config.title = "Add item"
-        config.image = UIImage(systemName: "plus")
-        config.imagePlacement = .leading
-        config.imagePadding = 8
-        config.baseBackgroundColor =
-            UIColor(named: "BrandPrimary") ?? .systemPurple
-        
-        let button = UIButton(configuration: config)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        
-        button.addTarget(
-            self,
-            action: #selector(didTapAddItem),
-            for: .touchUpInside
-        )
-        
-        return button
-    }()
-    
-    @objc private func didTapAddItem() {
-        let addVC = AddClothingViewController()
-
-        addVC.onSave = { [weak self] newItem -> Bool in
-            guard let self,
-                  let clothingStore = self.clothingStore else {
-                return false
-            }
-
-            do {
-                try clothingStore.save(newItem)
-
-                self.items.append(newItem)
-
-                self.items.sort {
-                    $0.name.localizedCaseInsensitiveCompare($1.name)
-                        == .orderedAscending
-                }
-
-                self.collectionView.reloadData()
-                self.updateEmptyState()
-
-                return true
-
-            } catch {
-                print("Error saving clothing: \(error)")
-                return false
-            }
-        }
-
-        let navigationController = UINavigationController(
-            rootViewController: addVC
-        )
-
-        present(navigationController, animated: true)
-    }
-    
-    private lazy var addAnotherButton: UIButton = {
-        var configuration = UIButton.Configuration.filled()
-
-        configuration.image = UIImage(systemName: "plus")
-        configuration.baseBackgroundColor =
-            UIColor(named: "BrandPrimary") ?? .systemPurple
-        configuration.cornerStyle = .capsule
-
-        let button = UIButton(configuration: configuration)
-
-        button.accessibilityLabel = "Add another item"
-        button.translatesAutoresizingMaskIntoConstraints = false
-
-        button.addTarget(
-            self,
-            action: #selector(didTapAddItem),
-            for: .touchUpInside
-        )
-
-        return button
-    }()
-    
     private lazy var emptyStateStack: UIStackView = {
         let stack = UIStackView(
             arrangedSubviews: [
@@ -184,9 +104,18 @@ final class ViewController: UIViewController {
         layout.minimumInteritemSpacing = 12
         layout.minimumLineSpacing = 16
         
+        layout.sectionInset = UIEdgeInsets(
+            top: 12,
+            left: 20,
+            bottom: 24,
+            right: 20
+        )
+        
+        layout.estimatedItemSize = .zero
+        
         let collection = UICollectionView(frame: .zero, collectionViewLayout: layout)
         
-        collection.backgroundColor = .systemBackground
+        collection.backgroundColor = .clear
         collection.translatesAutoresizingMaskIntoConstraints = false
         
         collection.dataSource = self
@@ -197,45 +126,94 @@ final class ViewController: UIViewController {
         return collection
     }()
     
-    // MARK: - CRUD
+    //MARK: - BUTTONS
+    private lazy var addButton: UIButton = {
+        var config = UIButton.Configuration.filled()
+        config.title = "Add item"
+        config.image = UIImage(systemName: "plus")
+        config.imagePlacement = .leading
+        config.imagePadding = 8
+        config.baseBackgroundColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
+        
+        let button = UIButton(configuration: config)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        button.addTarget(
+            self,
+            action: #selector(didTapAddItem),
+            for: .touchUpInside
+        )
+        
+        return button
+    }()
     
-    private func showItemActions(for item: ClothingItem) {
-        let alert = UIAlertController(
-            title: item.name,
-            message: "What would you like to do?",
-            preferredStyle: .actionSheet
+    private lazy var addAnotherButton: UIButton = {
+        var configuration = UIButton.Configuration.filled()
+
+        configuration.image = UIImage(systemName: "plus")
+        configuration.baseBackgroundColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
+        configuration.cornerStyle = .capsule
+
+        let button = UIButton(configuration: configuration)
+
+        button.accessibilityLabel = "Add another item"
+        button.translatesAutoresizingMaskIntoConstraints = false
+
+        button.addTarget(
+            self,
+            action: #selector(didTapAddItem),
+            for: .touchUpInside
         )
 
-        alert.addAction(UIAlertAction(
-            title: "Edit",
-            style: .default
-        ) { [weak self] _ in
-            self?.editItem(item)
-        })
+        return button
+    }()
+    
+    //MARK: - BUTTONS FUNCTIONS
+    
+    @objc private func didTapAddItem() {
+        let addVC = AddClothingViewController()
 
-        alert.addAction(UIAlertAction(
-            title: "Delete",
-            style: .destructive
-        ) { [weak self] _ in
-            self?.confirmDelete(item)
-        })
+        addVC.onSave = { [weak self] newItem -> Bool in
+            guard let self,
+                  let clothingStore = self.clothingStore else {
+                return false
+            }
 
-        alert.addAction(UIAlertAction(
-            title: "Cancel",
-            style: .cancel
-        ))
+            do {
+                try clothingStore.save(newItem)
 
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = collectionView
-            popover.sourceRect = collectionView.bounds
+                self.items.append(newItem)
+
+                self.items.sort {
+                    $0.name.localizedCaseInsensitiveCompare($1.name)
+                        == .orderedAscending
+                }
+
+                self.collectionView.reloadData()
+                self.updateEmptyState()
+
+                return true
+
+            } catch {
+                print("Error saving clothing: \(error)")
+                return false
+            }
         }
 
-        present(alert, animated: true)
+        navigationController?.pushViewController(
+            addVC,
+            animated: true
+        )
     }
     
+    // MARK: - CRUD
     private func editItem(_ item: ClothingItem) {
         let editVC = AddClothingViewController()
         editVC.editingItem = item
+
+        // MARK: - Update
 
         editVC.onSave = { [weak self] updatedItem -> Bool in
             guard let self,
@@ -247,77 +225,219 @@ final class ViewController: UIViewController {
                 try clothingStore.update(updatedItem)
                 self.loadSavedItems()
                 return true
+
             } catch {
                 print("Update failed: \(error)")
                 return false
             }
         }
 
-        let navigationController = UINavigationController(
-            rootViewController: editVC
-        )
+        // MARK: - Delete
 
-        present(navigationController, animated: true)
+        editVC.onDelete = { [weak self] item -> Bool in
+            guard let self,
+                  let clothingStore = self.clothingStore else {
+                return false
+            }
+
+            do {
+                try clothingStore.delete(id: item.id)
+                self.loadSavedItems()
+                return true
+
+            } catch {
+                print("Delete failed: \(error)")
+                return false
+            }
+        }
+
+        // MARK: - Navigation
+
+        navigationController?.pushViewController(
+            editVC,
+            animated: true
+        )
     }
 
-    private func confirmDelete(_ item: ClothingItem) {
-        let alert = UIAlertController(
-            title: "Delete Clothing?",
-            message: "Are you sure you want to delete \(item.name)?",
-            preferredStyle: .alert
-        )
-
-        alert.addAction(UIAlertAction(
-            title: "Cancel",
-            style: .cancel
-        ))
-
-        alert.addAction(UIAlertAction(
-            title: "Delete",
-            style: .destructive
-        ) { [weak self] _ in
-            self?.deleteItem(item)
-        })
-
-        present(alert, animated: true)
-    }
+    //MARK: - FILTER
     
-    private func deleteItem(_ item: ClothingItem) {
-        guard let clothingStore else { return }
+    private var selectedFilter: ClothingCategory?
 
-        do {
-            try clothingStore.delete(id: item.id)
-            loadSavedItems()
-        } catch {
-            let alert = UIAlertController(
-                title: "Delete Failed",
-                message: error.localizedDescription,
-                preferredStyle: .alert
-            )
+    private var filteredItems: [ClothingItem] {
+        guard let selectedFilter else {
+            return items
+        }
 
-            alert.addAction(UIAlertAction(
-                title: "OK",
-                style: .default
-            ))
-
-            present(alert, animated: true)
+        return items.filter {
+            $0.category == selectedFilter
         }
     }
-
-    //MARK: - FIM DO CRUD
     
-    private func updateEmptyState() {
-        let hasItems = !items.isEmpty
+    private let filterScrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        return scrollView
+    }()
 
-        collectionView.isHidden = !hasItems
-        addAnotherButton.isHidden = !hasItems
-        emptyStateStack.isHidden = hasItems
+    private let filterStackView: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+
+    private var filterButtons: [UIButton] = []
+    
+    private func addFilterButton(
+        title: String,
+        index: Int
+    ) {
+        var config = UIButton.Configuration.filled()
+
+        config.title = title
+        config.cornerStyle = .capsule
+        config.contentInsets = NSDirectionalEdgeInsets(
+            top: 8,
+            leading: 16,
+            bottom: 8,
+            trailing: 16
+        )
+
+        let button = UIButton(configuration: config)
+        button.tag = index
+
+        button.addTarget(
+            self,
+            action: #selector(didTapFilter(_:)),
+            for: .touchUpInside
+        )
+
+        filterButtons.append(button)
+        filterStackView.addArrangedSubview(button)
+    }
+    
+    private func setupFilters() {
+        view.addSubview(filterScrollView)
+        filterScrollView.addSubview(filterStackView)
+
+        addFilterButton(title: "All", index: 0)
+
+        for (index, category) in
+            ClothingCategory.allCases.enumerated() {
+
+            addFilterButton(
+                title: category.rawValue.capitalized,
+                index: index + 1
+            )
+        }
+
+        NSLayoutConstraint.activate([
+            filterStackView.leadingAnchor.constraint(
+                equalTo: filterScrollView.contentLayoutGuide.leadingAnchor,
+                constant: 20
+            ),
+            filterStackView.trailingAnchor.constraint(
+                equalTo: filterScrollView.contentLayoutGuide.trailingAnchor,
+                constant: -20
+            ),
+            filterStackView.topAnchor.constraint(
+                equalTo: filterScrollView.contentLayoutGuide.topAnchor
+            ),
+            filterStackView.bottomAnchor.constraint(
+                equalTo: filterScrollView.contentLayoutGuide.bottomAnchor
+            ),
+            filterStackView.heightAnchor.constraint(
+                equalTo: filterScrollView.frameLayoutGuide.heightAnchor
+            )
+        ])
+
+        updateFilterAppearance()
+    }
+
+    @objc private func didTapFilter(_ sender: UIButton) {
+        if sender.tag == 0 {
+            selectedFilter = nil
+        } else {
+            selectedFilter = ClothingCategory.allCases[
+                sender.tag - 1
+            ]
+        }
+
+        updateFilterAppearance()
+        collectionView.reloadData()
+        updateEmptyState()
+    }
+    
+    private func updateFilterAppearance() {
+        let brandColor = UIColor(named: "BrandPrimary") ?? .systemPurple
+        for (index, button) in filterButtons.enumerated() {
+            let isSelected: Bool
+
+            if index == 0 {
+                isSelected = selectedFilter == nil
+            } else {
+                isSelected = selectedFilter ==
+                    ClothingCategory.allCases[index - 1]
+            }
+
+            var config = button.configuration
+
+            config?.baseBackgroundColor = isSelected
+                ? brandColor
+                : .secondarySystemGroupedBackground
+
+            config?.baseForegroundColor = isSelected
+                ? .white
+                : .secondaryLabel
+            
+            //filtros não selecionados
+            config?.background.strokeColor = isSelected
+            ? .clear
+            : .separator
+            
+            config?.background.strokeWidth = isSelected ? 0 : 1
+
+            button.configuration = config
+
+            button.accessibilityTraits = isSelected
+                ? [.button, .selected]
+                : [.button]
+        }
+    }
+    
+    //MARK: - VIEW
+    private func updateEmptyState() {
+        let isEmpty = filteredItems.isEmpty
+
+        collectionView.isHidden = isEmpty
+        addAnotherButton.isHidden = isEmpty
+        emptyStateStack.isHidden = !isEmpty
+        
+        if items.isEmpty {
+            messageLabel.text = "Your wardrobe is empty."
+        } else if let selectedFilter, filteredItems.isEmpty {
+            messageLabel.text =
+                "No \(selectedFilter.rawValue.lowercased()) yet."
+        }
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        navigationController?.setNavigationBarHidden(
+            true,
+            animated: animated
+        )
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         setupViews()
+        setupFilters()
         setupConstraints()
         updateEmptyState()
     }
@@ -366,12 +486,6 @@ final class ViewController: UIViewController {
         view.addSubview(emptyStateStack)
         view.addSubview(addAnotherButton)
         collectionView.contentInset.bottom = 88
-        
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .add,
-            target: self,
-            action: #selector(didTapAddItem)
-        )
     }
     
     private func setupConstraints() {
@@ -431,8 +545,8 @@ final class ViewController: UIViewController {
             // MARK: - Collection View
 
             collectionView.topAnchor.constraint(
-                equalTo: titleStack.bottomAnchor,
-                constant: 24
+                equalTo: filterScrollView.bottomAnchor,
+                constant: 14
             ),
 
             collectionView.leadingAnchor.constraint(
@@ -464,6 +578,25 @@ final class ViewController: UIViewController {
 
             addAnotherButton.heightAnchor.constraint(
                 equalToConstant: 56
+            ),
+            
+            //MARK: - Filters
+            
+            filterScrollView.topAnchor.constraint(
+                equalTo: subtitleLabel.bottomAnchor,
+                constant: 18
+            ),
+
+            filterScrollView.leadingAnchor.constraint(
+                equalTo: view.leadingAnchor
+            ),
+
+            filterScrollView.trailingAnchor.constraint(
+                equalTo: view.trailingAnchor
+            ),
+
+            filterScrollView.heightAnchor.constraint(
+                equalToConstant: 44
             )
         ])
     }
@@ -475,7 +608,7 @@ extension ViewController: UICollectionViewDataSource {
         _ collectionView: UICollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
-        return items.count
+        return filteredItems.count
     }
 
     func collectionView(
@@ -488,7 +621,7 @@ extension ViewController: UICollectionViewDataSource {
             for: indexPath
         ) as! ClothingCell
 
-        let item = items[indexPath.item]
+        let item = filteredItems[indexPath.item]
         cell.configure(with: item)
 
         return cell
@@ -496,29 +629,36 @@ extension ViewController: UICollectionViewDataSource {
 }
 
 extension ViewController: UICollectionViewDelegateFlowLayout {
-
+    
     func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
         sizeForItemAt indexPath: IndexPath
     ) -> CGSize {
 
+        let horizontalPadding: CGFloat = 40
         let spacing: CGFloat = 12
-        let availableWidth = collectionView.bounds.width - spacing
-        let itemWidth = availableWidth / 2
+
+        let availableWidth = collectionView.bounds.width
+            - horizontalPadding - spacing
+
+        let width = floor(availableWidth / 2)
+
+        let imageHeight = width * 1.18
+        let textHeight: CGFloat = 84
 
         return CGSize(
-            width: itemWidth,
-            height: 150
+            width: width,
+            height: ceil(imageHeight + textHeight)
         )
     }
-    
+
     func collectionView(
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath
     ) {
-        let item = items[indexPath.item]
-        showItemActions(for: item)
+        let item = filteredItems[indexPath.item]
+        editItem(item)
     }
 }
 

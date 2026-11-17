@@ -11,13 +11,12 @@ import PhotosUI
 
 final class AddClothingViewController: UIViewController {
     var onSave: ((ClothingItem) -> Bool)?
+    var onDelete: ((ClothingItem) -> Bool)?
     
     var editingItem: ClothingItem?
     
     private func configureForEditing() {
         guard let item = editingItem else { return }
-
-        title = "Edit Clothing"
 
         nameTextField.text = item.name
         selectedCategory = item.category
@@ -369,13 +368,45 @@ final class AddClothingViewController: UIViewController {
             return
         }
 
-        dismiss(animated: true)
+        navigationController?.popViewController(
+            animated: true
+        )
     }
     
-    @objc private func didTapCancel() {
-        dismiss(animated: true)
-    }
+    @objc private func didTapDelete() {
+        guard let item = editingItem else { return }
 
+        let alert = UIAlertController(
+            title: "Delete Clothing?",
+            message: "Are you sure you want to delete \(item.name)? This action cannot be undone.",
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(
+            title: "Cancel",
+            style: .cancel
+        ))
+
+        alert.addAction(UIAlertAction(
+            title: "Delete",
+            style: .destructive
+        ) { [weak self] _ in
+            guard let self else { return }
+
+            if self.onDelete?(item) == true {
+                self.navigationController?.popViewController(
+                    animated: true
+                )
+            } else {
+                self.showAlert(
+                    message: "Could not delete this item. Please try again."
+                )
+            }
+        })
+
+        present(alert, animated: true)
+    }
+    
     private func showAlert(message: String) {
         let alert = UIAlertController(
             title: "Fit Check",
@@ -389,6 +420,58 @@ final class AddClothingViewController: UIViewController {
 
         present(alert, animated: true)
     }
+    
+    @objc private func keyboardDidShow() {
+        guard nameTextField.isFirstResponder else {
+            return
+        }
+
+        view.layoutIfNeeded()
+
+        let textFieldRect = nameTextField.convert(
+            nameTextField.bounds,
+            to: scrollView
+        )
+
+        let visibleRect = textFieldRect.insetBy(
+            dx: 0,
+            dy: -20
+        )
+
+        scrollView.scrollRectToVisible(
+            visibleRect,
+            animated: true
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private func setupNavigationBar() {
+        navigationItem.title = editingItem == nil
+            ? "Add Clothing"
+            : "Edit Clothing"
+
+        navigationItem.largeTitleDisplayMode = .never
+
+        navigationController?.navigationBar.tintColor =
+            UIColor(named: "BrandPrimary") ?? .systemPurple
+
+        if editingItem != nil {
+            let deleteButton = UIBarButtonItem(
+                image: UIImage(systemName: "trash"),
+                style: .plain,
+                target: self,
+                action: #selector(didTapDelete)
+            )
+
+            deleteButton.tintColor = .systemRed
+            deleteButton.accessibilityLabel = "Delete clothing item"
+
+            navigationItem.rightBarButtonItem = deleteButton
+        }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -396,19 +479,28 @@ final class AddClothingViewController: UIViewController {
         setupViews()
         setupConstraints()
         configureForEditing()
+        setupNavigationBar()
+        
+        NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(keyboardDidShow),
+                name: UIResponder.keyboardDidShowNotification,
+                object: nil
+        )
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        navigationController?.setNavigationBarHidden(
+            false,
+            animated: animated
+        )
     }
     
     private func setupViews() {
-        title = "Add Clothing"
         view.backgroundColor = .systemBackground
-
-        // navigation bar
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .cancel,
-            target: self,
-            action: #selector(didTapCancel)
-        )
-
+        
         // hierarchy
         view.addSubview(scrollView)
         scrollView.addSubview(addClothingStackView)
@@ -434,7 +526,7 @@ final class AddClothingViewController: UIViewController {
             ),
 
             scrollView.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor
+                equalTo: view.keyboardLayoutGuide.topAnchor
             ),
 
             // MARK: - Stack View
@@ -531,9 +623,7 @@ extension AddClothingViewController: UITextFieldDelegate {
     }
 }
 
-extension AddClothingViewController:
-    UIImagePickerControllerDelegate,
-    UINavigationControllerDelegate {
+extension AddClothingViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 
     func imagePickerController(
         _ picker: UIImagePickerController,

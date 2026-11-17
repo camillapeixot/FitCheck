@@ -197,6 +197,115 @@ final class ViewController: UIViewController {
         return collection
     }()
     
+    // MARK: - CRUD
+    
+    private func showItemActions(for item: ClothingItem) {
+        let alert = UIAlertController(
+            title: item.name,
+            message: "What would you like to do?",
+            preferredStyle: .actionSheet
+        )
+
+        alert.addAction(UIAlertAction(
+            title: "Edit",
+            style: .default
+        ) { [weak self] _ in
+            self?.editItem(item)
+        })
+
+        alert.addAction(UIAlertAction(
+            title: "Delete",
+            style: .destructive
+        ) { [weak self] _ in
+            self?.confirmDelete(item)
+        })
+
+        alert.addAction(UIAlertAction(
+            title: "Cancel",
+            style: .cancel
+        ))
+
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = collectionView
+            popover.sourceRect = collectionView.bounds
+        }
+
+        present(alert, animated: true)
+    }
+    
+    private func editItem(_ item: ClothingItem) {
+        let editVC = AddClothingViewController()
+        editVC.editingItem = item
+
+        editVC.onSave = { [weak self] updatedItem -> Bool in
+            guard let self,
+                  let clothingStore = self.clothingStore else {
+                return false
+            }
+
+            do {
+                try clothingStore.update(updatedItem)
+                self.loadSavedItems()
+                return true
+            } catch {
+                print("Update failed: \(error)")
+                return false
+            }
+        }
+
+        let navigationController = UINavigationController(
+            rootViewController: editVC
+        )
+
+        present(navigationController, animated: true)
+    }
+
+    private func confirmDelete(_ item: ClothingItem) {
+        let alert = UIAlertController(
+            title: "Delete Clothing?",
+            message: "Are you sure you want to delete \(item.name)?",
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(
+            title: "Cancel",
+            style: .cancel
+        ))
+
+        alert.addAction(UIAlertAction(
+            title: "Delete",
+            style: .destructive
+        ) { [weak self] _ in
+            self?.deleteItem(item)
+        })
+
+        present(alert, animated: true)
+    }
+    
+    private func deleteItem(_ item: ClothingItem) {
+        guard let clothingStore else { return }
+
+        do {
+            try clothingStore.delete(id: item.id)
+            loadSavedItems()
+        } catch {
+            let alert = UIAlertController(
+                title: "Delete Failed",
+                message: error.localizedDescription,
+                preferredStyle: .alert
+            )
+
+            alert.addAction(UIAlertAction(
+                title: "OK",
+                style: .default
+            ))
+
+            present(alert, animated: true)
+        }
+    }
+
+    //MARK: - FIM DO CRUD
+    
     private func updateEmptyState() {
         let hasItems = !items.isEmpty
 
@@ -402,6 +511,14 @@ extension ViewController: UICollectionViewDelegateFlowLayout {
             width: itemWidth,
             height: 150
         )
+    }
+    
+    func collectionView(
+        _ collectionView: UICollectionView,
+        didSelectItemAt indexPath: IndexPath
+    ) {
+        let item = items[indexPath.item]
+        showItemActions(for: item)
     }
 }
 

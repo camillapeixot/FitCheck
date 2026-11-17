@@ -12,6 +12,32 @@ import PhotosUI
 final class AddClothingViewController: UIViewController {
     var onSave: ((ClothingItem) -> Bool)?
     
+    var editingItem: ClothingItem?
+    
+    private func configureForEditing() {
+        guard let item = editingItem else { return }
+
+        title = "Edit Clothing"
+
+        nameTextField.text = item.name
+        selectedCategory = item.category
+
+        var configuration = categoryButton.configuration
+        configuration?.title = item.category.rawValue
+        categoryButton.configuration = configuration
+
+        if let data = item.photoData,
+           let image = UIImage(data: data) {
+            selectedImage = image
+            clothingImageView.image = image
+            clothingImageView.contentMode = .scaleAspectFill
+        }
+
+        var saveConfiguration = saveButton.configuration
+        saveConfiguration?.title = "Save Changes"
+        saveButton.configuration = saveConfiguration
+    }
+    
     private let nameTextField: UITextField = {
         let field = UITextField()
 
@@ -329,7 +355,7 @@ final class AddClothingViewController: UIViewController {
         }
 
         let newItem = ClothingItem(
-            id: UUID(),
+            id: editingItem?.id ?? UUID(),
             name: name,
             category: selectedCategory,
             symbolName: "tshirt",
@@ -369,6 +395,7 @@ final class AddClothingViewController: UIViewController {
 
         setupViews()
         setupConstraints()
+        configureForEditing()
     }
     
     private func setupViews() {

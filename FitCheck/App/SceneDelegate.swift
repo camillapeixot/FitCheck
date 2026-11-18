@@ -19,15 +19,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else {
             return
         }
-
-        let wardrobeVC = ViewController()
-
-        let navigationController = UINavigationController(
-            rootViewController: wardrobeVC
-        )
-
+        
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = navigationController
+        
+        let tabBarController = FitCheckTabBarController()
+        
+        window.rootViewController = tabBarController
 
         self.window = window
         window.makeKeyAndVisible()

@@ -477,6 +477,22 @@ final class ViewController: UIViewController {
             present(alert, animated: true)
         }
     }
+    
+    func wardrobeItemsSnapshot() throws -> [ClothingItem] {
+        if clothingStore == nil {
+            clothingStore = try ClothingStore()
+        }
+
+        guard let clothingStore else {
+            return []
+        }
+
+        return try clothingStore.loadItems()
+    }
+    
+    func openAddClothing() {
+        didTapAddItem()
+    }
 
     private func setupViews() {
         view.backgroundColor = .systemBackground

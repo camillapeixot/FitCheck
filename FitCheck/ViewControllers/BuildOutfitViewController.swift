@@ -9,36 +9,39 @@ import UIKit
 
 @MainActor
 final class BuildOutfitViewController: UIViewController {
-    // MARK: - entrada de dados e estado
+    // MARK: - Entrada de dados e estado
     private var wardrobeItems: [ClothingItem]
     var onLoadWardrobe: (@MainActor () throws -> [ClothingItem])?
     var onAddClothing: (() -> Void)?
-    
+    var onSaveOutfit: ((Outfit) throws -> Void)?
+    var onLoadSavedOutfits: (() throws -> [SavedOutfit])?
+    var onDeleteSavedOutfit: ((UUID) throws -> Void)?
+
     private var selectedCategory: ClothingCategory = .tops
     private var selectedItems: [ClothingCategory: ClothingItem] = [:]
     private var selectedAccessories: [ClothingItem] = []
     private var currentOutfit: Outfit?
-    
+
     init(items: [ClothingItem]) {
         wardrobeItems = items
         super.init(nibName: nil, bundle: nil)
     }
-    
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     private var filteredItems: [ClothingItem] {
         wardrobeItems.filter { $0.category == selectedCategory }
     }
-    
+
     private var canCreateLook: Bool {
         selectedItems[.tops] != nil &&
         selectedItems[.bottoms] != nil &&
         selectedItems[.shoes] != nil
     }
-    
-    //MARK: - cabeçalho
+
+    // MARK: - Cabeçalho (igual à My Wardrobe)
     private let titleLabel: UILabel = {
         let label = UILabel()
         label.text = "Build Outfit"
@@ -48,7 +51,7 @@ final class BuildOutfitViewController: UIViewController {
         label.numberOfLines = 0
         return label
     }()
-    
+
     private let subtitleLabel: UILabel = {
         let label = UILabel()
         label.text = "Mix and match your favorite pieces."
@@ -58,7 +61,7 @@ final class BuildOutfitViewController: UIViewController {
         label.numberOfLines = 0
         return label
     }()
-    
+
     private let previewTitleLabel: UILabel = {
         let label = UILabel()
         label.text = "Create your outfit"
@@ -67,7 +70,7 @@ final class BuildOutfitViewController: UIViewController {
         label.adjustsFontForContentSizeCategory = true
         return label
     }()
-    
+
     private let previewSubtitleLabel: UILabel = {
         let label = UILabel()
         label.text = "Start with a top, bottom and shoes. Accessories are optional."
@@ -77,9 +80,21 @@ final class BuildOutfitViewController: UIViewController {
         label.adjustsFontForContentSizeCategory = true
         return label
     }()
-    
+
     private let outfitPreview = OutfitPreviewView()
-    
+
+    private lazy var savedLooksButton: UIButton = {
+        var config = UIButton.Configuration.plain()
+        config.title = "Saved Looks"
+        config.image = UIImage(systemName: "bookmark")
+        config.imagePadding = 5
+        config.baseForegroundColor = UIColor(named: "BrandPrimary") ?? .systemPurple
+        let button = UIButton(configuration: config)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.addTarget(self, action: #selector(didTapSavedLooks), for: .touchUpInside)
+        return button
+    }()
+
     private let previewCard: UIView = {
         let view = UIView()
         view.backgroundColor = .secondarySystemGroupedBackground
@@ -88,7 +103,7 @@ final class BuildOutfitViewController: UIViewController {
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
-    
+
     private let instructionLabel: UILabel = {
         let label = UILabel()
         label.text = "Choose a category and tap a piece to add it to your outfit."
@@ -97,18 +112,20 @@ final class BuildOutfitViewController: UIViewController {
         label.numberOfLines = 0
         return label
     }()
-    
+
     private let progressLabel: UILabel = {
         let label = UILabel()
         label.textColor = .secondaryLabel
+        label.font = .preferredFont(forTextStyle: .caption1)
+        label.numberOfLines = 0
         return label
     }()
-    
+
     // MARK: - Filtros
     private let categoryScrollView = UIScrollView()
     private let categoryStackView = UIStackView()
     private var categoryButtons: [UIButton] = []
-    
+
     // MARK: - Miniaturas selecionáveis
     private lazy var pickerCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -116,7 +133,7 @@ final class BuildOutfitViewController: UIViewController {
         layout.itemSize = CGSize(width: 96, height: 112)
         layout.minimumLineSpacing = 10
         layout.sectionInset = .zero
-        
+
         let collection = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collection.backgroundColor = .clear
         collection.showsHorizontalScrollIndicator = false
@@ -129,7 +146,7 @@ final class BuildOutfitViewController: UIViewController {
         )
         return collection
     }()
-    
+
     // MARK: - Categoria vazia
     private let emptyTitleLabel: UILabel = {
         let label = UILabel()
@@ -203,7 +220,7 @@ final class BuildOutfitViewController: UIViewController {
         button.addTarget(self, action: #selector(didTapCreateLook), for: .touchUpInside)
         return button
     }()
-    
+
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
 
@@ -233,9 +250,16 @@ final class BuildOutfitViewController: UIViewController {
         contentStack.spacing = 18
         contentStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let header = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
-        header.axis = .vertical
-        header.spacing = 15
+        let titles = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        titles.axis = .vertical
+        titles.spacing = 15
+        titles.alignment = .leading
+
+        let header = UIStackView(arrangedSubviews: [titles, savedLooksButton])
+        header.axis = .horizontal
+        header.alignment = .top
+        header.spacing = 8
+        header.distribution = .fill
 
         let previewContent = UIStackView(arrangedSubviews: [
             previewTitleLabel, previewSubtitleLabel, outfitPreview
@@ -256,7 +280,7 @@ final class BuildOutfitViewController: UIViewController {
         contentStack.addArrangedSubview(pickerCollectionView)
         contentStack.addArrangedSubview(emptyCategoryCard)
         contentStack.addArrangedSubview(progressLabel)
-        
+
         NSLayoutConstraint.activate([
             previewContent.topAnchor.constraint(equalTo: previewCard.topAnchor, constant: 16),
             previewContent.leadingAnchor.constraint(equalTo: previewCard.leadingAnchor, constant: 16),
@@ -359,7 +383,7 @@ final class BuildOutfitViewController: UIViewController {
         updatePickerState()
         updateCreateLookButton()
     }
-    
+
     private func updatePickerState() {
         let isEmpty = filteredItems.isEmpty
         pickerCollectionView.isHidden = isEmpty
@@ -397,10 +421,43 @@ final class BuildOutfitViewController: UIViewController {
 
     @objc private func didTapCreateLook() {
         guard canCreateLook else { return }
+        guard let onSaveOutfit else {
+            showMessage("Saving isn't configured yet. Please check the tab bar setup.")
+            return
+        }
         let ordered = [selectedItems[.tops], selectedItems[.bottoms], selectedItems[.shoes]]
             .compactMap { $0 } + selectedAccessories
-        currentOutfit = Outfit(name: "My Outfit", items: ordered)
-        showMessage("Your look is ready! It is a preview for now; saving looks comes in Aula 10.")
+
+        // Alertas curtos fazem sentido aqui: estamos pedindo apenas o nome do look.
+        let alert = UIAlertController(title: "Save your look", message: "Choose a name for this outfit.", preferredStyle: .alert)
+        alert.addTextField { field in
+            field.text = "My Outfit"
+            field.placeholder = "Outfit name"
+            field.autocapitalizationType = .words
+            field.clearButtonMode = .whileEditing
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Save", style: .default) { [weak self, weak alert] _ in
+            guard let self, let alert else { return }
+            let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let outfit = Outfit(name: name, items: ordered)
+            do {
+                try onSaveOutfit(outfit)
+                self.currentOutfit = outfit
+                self.showMessage("Look saved! Open Saved Looks to see it again.")
+            } catch {
+                self.showMessage("Couldn't save look: \(error.localizedDescription)")
+            }
+        })
+        present(alert, animated: true)
+    }
+
+    @objc private func didTapSavedLooks() {
+        let savedVC = SavedOutfitsViewController()
+        savedVC.onLoadOutfits = onLoadSavedOutfits
+        savedVC.onDeleteOutfit = onDeleteSavedOutfit
+        savedVC.onLoadWardrobe = onLoadWardrobe
+        navigationController?.pushViewController(savedVC, animated: true)
     }
 
     private func showMessage(_ message: String) {
@@ -411,7 +468,6 @@ final class BuildOutfitViewController: UIViewController {
 }
 
 // MARK: - UICollectionView
-
 extension BuildOutfitViewController: UICollectionViewDataSource, UICollectionViewDelegate {
     func collectionView(
         _ collectionView: UICollectionView,
@@ -457,4 +513,3 @@ extension BuildOutfitViewController: UICollectionViewDataSource, UICollectionVie
         refreshInterface()
     }
 }
-

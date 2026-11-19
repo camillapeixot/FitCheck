@@ -12,10 +12,7 @@ enum ClothingStoreError: LocalizedError {
     case itemNotFound
 
     var errorDescription: String? {
-        switch self {
-        case .itemNotFound:
-            return "This clothing item could not be found."
-        }
+        "This clothing item could not be found."
     }
 }
 
@@ -25,9 +22,7 @@ final class ClothingStore {
     private let container: ModelContainer
 
     init() throws {
-        container = try ModelContainer(
-            for: ClothingRecord.self
-        )
+        container = try FitCheckModelContainer.shared()
     }
 
     func save(_ item: ClothingItem) throws {
@@ -62,21 +57,18 @@ final class ClothingStore {
     
     private func findRecord(id: UUID) throws -> ClothingRecord? {
         let descriptor = FetchDescriptor<ClothingRecord>(
-            predicate: #Predicate<ClothingRecord> {
-                $0.id == id
-            }
+            predicate: #Predicate<ClothingRecord> { $0.id == id }
         )
 
         return try container.mainContext.fetch(descriptor).first
     }
-    
+
     func update(_ item: ClothingItem) throws {
         guard let record = try findRecord(id: item.id) else {
             throw ClothingStoreError.itemNotFound
         }
 
         let context = container.mainContext
-
         record.name = item.name
         record.category = item.category.rawValue
         record.symbolName = item.symbolName
@@ -89,14 +81,13 @@ final class ClothingStore {
             throw error
         }
     }
-    
+
     func delete(id: UUID) throws {
         guard let record = try findRecord(id: id) else {
             throw ClothingStoreError.itemNotFound
         }
 
         let context = container.mainContext
-
         context.delete(record)
 
         do {
@@ -106,5 +97,4 @@ final class ClothingStore {
             throw error
         }
     }
-
 }

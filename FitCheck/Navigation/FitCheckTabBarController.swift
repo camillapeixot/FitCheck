@@ -52,6 +52,18 @@ final class FitCheckTabBarController: UITabBarController {
             wardrobeVC?.openAddClothing()
         }
 
+        buildOutfitVC.onSaveOutfit = { outfit in
+            try OutfitStore().save(outfit)
+        }
+
+        buildOutfitVC.onLoadSavedOutfits = {
+            try OutfitStore().loadSavedOutfits()
+        }
+
+        buildOutfitVC.onDeleteSavedOutfit = { id in
+            try OutfitStore().delete(id: id)
+        }
+
         let looksNavigation = UINavigationController(
             rootViewController: buildOutfitVC
         )
@@ -65,6 +77,10 @@ final class FitCheckTabBarController: UITabBarController {
         // MARK: Surprise Me
 
         let surpriseVC = SurpriseMeViewController()
+
+        surpriseVC.onSaveOutfit = { outfit in
+            try OutfitStore().save(outfit)
+        }
 
         surpriseVC.onLoadWardrobe = { [weak wardrobeVC] in
             guard let wardrobeVC else { return [] }

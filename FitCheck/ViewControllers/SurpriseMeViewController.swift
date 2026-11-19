@@ -11,6 +11,7 @@ import UIKit
 final class SurpriseMeViewController: UIViewController {
     var onLoadWardrobe: (@MainActor () throws -> [ClothingItem])?
     var onAddClothing: (() -> Void)?
+    var onSaveOutfit: ((Outfit) throws -> Void)?
     
     private let generator = OutfitGenerator()
     private var wardrobeItems: [ClothingItem] = []
@@ -113,7 +114,7 @@ final class SurpriseMeViewController: UIViewController {
         return button
     }()
     
-    private let saveButton: UIButton = {
+    private lazy var saveButton: UIButton = {
         var config = UIButton.Configuration.filled()
         config.title = "Save Look"
         config.image = UIImage(systemName: "bookmark")
@@ -121,18 +122,10 @@ final class SurpriseMeViewController: UIViewController {
         config.cornerStyle = .capsule
         config.baseBackgroundColor = UIColor(named: "BrandPrimary") ?? .systemPurple
         let button = UIButton(configuration: config)
-        button.isEnabled = false // Persistência de looks será implementada na Aula 10.
-        button.accessibilityHint = "Saving outfits will be available after persistence is implemented"
+        button.isEnabled = false
+        button.accessibilityHint = "Name and save the current look"
+        button.addTarget(self, action: #selector(didTapSaveLook), for: .touchUpInside)
         return button
-    }()
-    
-    private let saveHintLabel: UILabel = {
-        let label = UILabel()
-        label.text = "Save Look will be enabled when we add SwiftData for outfits."
-        label.font = .preferredFont(forTextStyle: .caption2)
-        label.textColor = .secondaryLabel
-        label.numberOfLines = 0
-        return label
     }()
     
     private let scrollView = UIScrollView()
@@ -191,7 +184,6 @@ final class SurpriseMeViewController: UIViewController {
         contentStack.addArrangedSubview(addClothingButton)
         contentStack.addArrangedSubview(piecesTitleLabel)
         contentStack.addArrangedSubview(piecesStack)
-        contentStack.addArrangedSubview(saveHintLabel)
         
         NSLayoutConstraint.activate([
             heroContent.topAnchor.constraint(equalTo: heroCard.topAnchor, constant: 16),
@@ -263,7 +255,7 @@ final class SurpriseMeViewController: UIViewController {
         let items = currentOutfit?.items ?? []
         previewView.configure(items: items)
         piecesTitleLabel.isHidden = items.isEmpty
-        saveHintLabel.isHidden = items.isEmpty
+        saveButton.isEnabled = currentOutfit != nil && onSaveOutfit != nil
         addClothingButton.isHidden = !items.isEmpty
         let requiredCategories: [ClothingCategory] = [.tops, .bottoms, .shoes]
         let canShuffle = requiredCategories.allSatisfy { category in
@@ -323,6 +315,49 @@ final class SurpriseMeViewController: UIViewController {
         return row
     }
     
+    @objc private func didTapSaveLook() {
+        guard let currentOutfit, let onSaveOutfit else { return }
+
+        let alert = UIAlertController(
+            title: "Save your look",
+            message: "Choose a name for this outfit.",
+            preferredStyle: .alert
+        )
+
+        alert.addTextField { field in
+            field.text = "My Surprise Look"
+            field.autocapitalizationType = .words
+            field.clearButtonMode = .whileEditing
+        }
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Save", style: .default) { [weak self, weak alert] _ in
+            guard let self, let alert else { return }
+
+            let name = alert.textFields?.first?.text ?? ""
+            let outfit = Outfit(name: name, items: currentOutfit.items)
+
+            do {
+                try onSaveOutfit(outfit)
+                self.showSaveMessage("Look saved! Find it under Looks → Saved Looks.")
+            } catch {
+                self.showSaveMessage("Couldn't save look: \(error.localizedDescription)")
+            }
+        })
+
+        present(alert, animated: true)
+    }
+
+    private func showSaveMessage(_ message: String) {
+        let alert = UIAlertController(
+            title: "Fit Check",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
     @objc private func didTapAddClothing() {
         onAddClothing?()
     }
